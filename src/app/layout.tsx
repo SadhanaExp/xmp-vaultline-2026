@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Vaultline",
-  description: "Lock commercials, execute paper, and run renewal for Experience.com.",
+  description: "Turn deals into lasting contracts.",
 };
 
 export const maxDuration = 60;

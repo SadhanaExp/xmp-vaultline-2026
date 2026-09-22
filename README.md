@@ -13,9 +13,16 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:3001**.
+Open **http://localhost:3001**. You will be asked to sign in.
 
-Demo accounts load on start (ABC Corp, XYZ Corp, plus queued CRM packets). The header **clock** drives signing reminders and the 30-day renewal window.
+| Account | Password | Use |
+|---|---|---|
+| `sadhana@experience.com` | `demo1234` | Your login |
+| `demo@experience.com` | `demo1234` | Shareable demo login |
+
+Run `npm run db:seed` to upsert those users in local Postgres (`app_users`). Copy `.env.example` to `.env.local` and set `DATABASE_URL` plus `SESSION_SECRET`.
+
+Demo customer files load on start (ABC Corp, XYZ Corp, plus queued CRM packets). The header **clock** drives signing reminders and the 30-day renewal window.
 
 Copy `.env.example` to `.env.local` only if you need Postgres or Google Calendar. Do not commit `.env.local`.
 
@@ -67,13 +74,14 @@ See `.env.example`. Only placeholders belong in git:
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | Optional Postgres; otherwise in-memory demo state |
+| `DATABASE_URL` | Local Postgres for login users and optional workspace state |
+| `SESSION_SECRET` | Signs the Vaultline session cookie |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Service-account key (JSON or base64) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Local path to a key file (keep off git) |
 | `GOOGLE_CALENDAR_IMPERSONATE` | Workspace user for Meet + invites |
 | `READY_TO_CONTRACT_CALENDAR_ID` | Calendar the event is created on |
 
-No login. Do not commit `.env.local`, credential JSON, or production database URLs.
+Do not commit `.env.local`, credential JSON, or production database URLs.
 
 ## Deploy on Vercel
 

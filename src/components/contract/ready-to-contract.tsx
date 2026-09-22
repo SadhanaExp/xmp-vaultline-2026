@@ -18,6 +18,7 @@ import {
   Inbox,
   LoaderCircle,
   LockKeyhole,
+  LogOut,
   Mail,
   Menu,
   PenLine,
@@ -42,6 +43,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { logout } from "@/app/actions/auth";
 import type { AgentRun, ClockPreset, ContractState, ContractView, HandoffLead, NegotiationConcern, RenewalWatch } from "./types";
 
 const API = "/api/contract";
@@ -963,7 +965,15 @@ function RenewalView({ state, act }: ViewProps) {
   );
 }
 
-export function ReadyToContract({ leadId, customerId }: { leadId: string | null; customerId: string | null }) {
+export function ReadyToContract({
+  leadId,
+  customerId,
+  user,
+}: {
+  leadId: string | null;
+  customerId: string | null;
+  user: { name: string; email: string };
+}) {
   const [state, setState] = useState<ContractState>();
   const [view, setView] = useState<ContractView>("home");
   const [error, setError] = useState<string>();
@@ -1076,9 +1086,20 @@ export function ReadyToContract({ leadId, customerId }: { leadId: string | null;
           })}
         </nav>
 
-        <div className="mt-auto rounded-xl border border-border bg-muted/50 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-foreground"><ShieldCheck className="h-4 w-4 text-primary" />Legal / commercial ops</div>
-          <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Receive a qualified deal, lock terms, execute paper, run renewal.</p>
+        <div className="mt-auto space-y-3">
+          <div className="rounded-xl border border-border bg-muted/50 p-3">
+            <p className="text-xs font-semibold text-foreground">{user.name}</p>
+            <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{user.email}</p>
+            <form action={logout} className="mt-2">
+              <button type="submit" className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                <LogOut className="h-3.5 w-3.5" />Sign out
+              </button>
+            </form>
+          </div>
+          <div className="rounded-xl border border-border bg-muted/50 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground"><ShieldCheck className="h-4 w-4 text-primary" />Legal / commercial ops</div>
+            <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Receive a qualified deal, lock terms, execute paper, run renewal.</p>
+          </div>
         </div>
       </aside>
 

@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth";
 import {
   enqueueQuoteHandoff, getContractHandoff, getContractState, getExecutedCustomer, mutateContractState,
 } from "@/lib/contract/store";
@@ -44,7 +45,9 @@ function pdfText(customerName: string, agreementName: string): string {
   return output;
 }
 
-export async function GET(_request: Request, context: Context) {
+export async function GET(request: Request, context: Context) {
+  const gate = await requireApiUser(request);
+  if (gate instanceof Response) return gate;
   const { path } = await context.params;
   if (path.length === 1 && path[0] === "state") return Response.json(await getContractState());
 
@@ -68,6 +71,8 @@ export async function GET(_request: Request, context: Context) {
 }
 
 export async function POST(request: Request, context: Context) {
+  const gate = await requireApiUser(request);
+  if (gate instanceof Response) return gate;
   const { path } = await context.params;
   const route = path.join("/");
   const body = await json(request);
