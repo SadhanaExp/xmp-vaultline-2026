@@ -37,7 +37,13 @@ const TABLE = `create table if not exists app_users (
  */
 export async function ensureSeededUsers() {
   if (!postgresConfigured()) {
-    throw new Error("DATABASE_URL is not set. Add a local Postgres URL in .env.local.");
+    // A deployment only sees the variables that existed when it was built, so
+    // the hosted case is nearly always "set it, then redeploy".
+    throw new Error(
+      process.env.VERCEL
+        ? "DATABASE_URL is not set for this deployment. Add it to the Vercel project for this environment, then redeploy."
+        : "DATABASE_URL is not set. Add a local Postgres URL in .env.local.",
+    );
   }
   if (!seedPromise) {
     seedPromise = (async () => {

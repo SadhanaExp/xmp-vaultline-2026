@@ -2,14 +2,19 @@ import "server-only";
 
 let pool: import("pg").Pool | undefined;
 
+/** Dashboard paste often carries surrounding quotes, which pg cannot parse. */
+function databaseUrl() {
+  return (process.env.DATABASE_URL ?? "").trim().replace(/^['"]|['"]$/g, "");
+}
+
 export function postgresConfigured() {
-  return Boolean(process.env.DATABASE_URL?.trim());
+  return Boolean(databaseUrl());
 }
 
 export async function getPool() {
   if (!pool) {
     const { Pool } = await import("pg");
-    const connectionString = process.env.DATABASE_URL!;
+    const connectionString = databaseUrl();
     const local = /localhost|127\.0\.0\.1/.test(connectionString);
     pool = new Pool({
       connectionString,
