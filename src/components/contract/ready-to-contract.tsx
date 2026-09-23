@@ -802,6 +802,7 @@ function PaperView({ state, act, go }: ViewProps) {
             <Button disabled={!agreed || state.contract_generated} onClick={() => act("/contract/generate", {})}>Generate agreement + order form</Button>
             <Button variant="secondary" disabled={!state.contract_generated || state.sign_index > 0} onClick={() => act("/contract/send", {}, "signing")}>Send for signature</Button>
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">Demo: sending skips the DocuSign signing page so CE does not need inboxes. In live, the signer is taken to DocuSign and returned here after signing.</p>
         </CardContent>
       </Card>
       <Spine next="Ready to Contract" disabled={!state.contract_generated} onClick={() => go!("signing")} />
@@ -816,19 +817,26 @@ function PdfDownload({ href, label = "Download PDF" }: { href: string; label?: s
 
 function SigningView({ state, act, go }: ViewProps) {
   const watch = state.signing_watch;
-  const waiting = watch.status === "waiting_customer";
+  const skipped = watch.provider === "demo" || Boolean(watch.note?.includes("skipped"));
+  const waiting = watch.status === "waiting_customer" && !skipped;
   const parties = [
     { label: "Customer signer", name: watch.signer, email: watch.signer_email, done: state.sign_index >= 2 },
     { label: "Experience.com", name: "Countersign desk", email: "legal@experience.com", done: state.sign_index >= 3 },
   ];
   return (
     <div className="space-y-4">
+      {skipped && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-semibold">Demo profile — DocuSign signing page skipped</p>
+          <p className="mt-1">CE cannot open signer inboxes in this walkthrough, so Vaultline records customer signature and countersignature here. In live, this action navigates to DocuSign; once both parties have signed, control returns to this desk.</p>
+        </div>
+      )}
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card>
           <CardHeader>
             <Eyebrow>Envelope</Eyebrow>
             <CardTitle>{state.customer.contract.name} · {state.customer.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">Party timeline — no calendar product.</p>
+            <p className="text-sm text-muted-foreground">{skipped ? "Demo timeline — DocuSign not opened." : "Party timeline — no calendar product."}</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-1">{signSteps.map((step, index) => <div key={step} className="flex items-center gap-3 py-3"><span className={cn("h-4 w-4 rounded-full border-2", index < state.sign_index ? "border-primary bg-primary" : index === state.sign_index ? "border-amber-500 bg-amber-500 ring-4 ring-amber-100" : "border-border")} /><span className={cn("font-medium", index > state.sign_index && "text-muted-foreground")}>{step}</span></div>)}</div>
@@ -842,22 +850,36 @@ function SigningView({ state, act, go }: ViewProps) {
                 </div>
               ))}
             </div>
-            <Button className="mt-4" disabled={!state.contract_generated || state.sign_index >= 4} onClick={() => act("/signing/advance", {})}>{state.sign_index >= 4 ? "Fully executed" : state.sign_index === 1 ? "Record customer signature" : "Advance envelope"}</Button>
+            {!skipped && (
+              <Button className="mt-4" disabled={!state.contract_generated || state.sign_index >= 4} onClick={() => act("/signing/advance", {})}>
+                {state.sign_index >= 4 ? "Fully executed" : state.sign_index === 1 ? "Record customer signature" : "Advance envelope"}
+              </Button>
+            )}
+            {watch.note && <p className="mt-3 text-xs text-muted-foreground">{watch.note}</p>}
           </CardContent>
         </Card>
         <Card className="h-fit">
           <CardHeader>
-            <Eyebrow>3-day reminder</Eyebrow>
+            <Eyebrow>{skipped ? "Live vs demo" : "3-day reminder"}</Eyebrow>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle>{waiting ? "Waiting for customer" : watch.status === "not_sent" ? "Not sent yet" : watch.status.replaceAll("_", " ")}</CardTitle>
-              <StatusBadge status={waiting ? "waiting" : watch.status} />
+              <CardTitle>{skipped ? "No inbox wait" : waiting ? "Waiting for customer" : watch.status === "not_sent" ? "Not sent yet" : watch.status.replaceAll("_", " ")}</CardTitle>
+              <StatusBadge status={skipped && state.sign_index >= 4 ? "fully_executed" : waiting ? "waiting" : watch.status} />
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {watch.sent_at && <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"><dt className="text-muted-foreground">Sent</dt><dd>{formatDate(watch.sent_at)}</dd><dt className="text-muted-foreground">Waiting</dt><dd>{watch.days_waiting} day{watch.days_waiting === 1 ? "" : "s"}</dd><dt className="text-muted-foreground">Reminder due</dt><dd>{watch.reminder_due_at ? formatDate(watch.reminder_due_at) : "—"}</dd></dl>}
-            {waiting && !watch.reminder_sent_at && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Follow-up scheduled</strong><p className="mt-1">If still unsigned, {watch.signer} is emailed after three days. Jump the header clock to “Signing +3d”.</p></div>}
-            {watch.reminder_sent_at && <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"><strong className="flex items-center gap-2"><Mail className="h-4 w-4" />Reminder sent</strong><p className="mt-1">Reminder #{watch.reminder_count} sent on {formatDate(watch.reminder_sent_at)}.</p></div>}
-            {waiting && <Button variant="secondary" size="sm" onClick={() => act("/clock", { preset: "signing_day_3" }, "signing")}>Demo: 3 days later</Button>}
+            {skipped ? (
+              <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-foreground">
+                <p>This environment does not open DocuSign or send signer email, because CE cannot check those inboxes.</p>
+                <p className="mt-2 text-muted-foreground">Production: Send for signature → DocuSign signing page → both parties sign → return to Vaultline with the executed file in the vault.</p>
+              </div>
+            ) : (
+              <>
+                {watch.sent_at && <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"><dt className="text-muted-foreground">Sent</dt><dd>{formatDate(watch.sent_at)}</dd><dt className="text-muted-foreground">Waiting</dt><dd>{watch.days_waiting} day{watch.days_waiting === 1 ? "" : "s"}</dd><dt className="text-muted-foreground">Reminder due</dt><dd>{watch.reminder_due_at ? formatDate(watch.reminder_due_at) : "—"}</dd></dl>}
+                {waiting && !watch.reminder_sent_at && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><strong>Follow-up scheduled</strong><p className="mt-1">If still unsigned, {watch.signer} is emailed after three days. Jump the header clock to “Signing +3d”.</p></div>}
+                {watch.reminder_sent_at && <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800"><strong className="flex items-center gap-2"><Mail className="h-4 w-4" />Reminder sent</strong><p className="mt-1">Reminder #{watch.reminder_count} sent on {formatDate(watch.reminder_sent_at)}.</p></div>}
+                {waiting && <Button variant="secondary" size="sm" onClick={() => act("/clock", { preset: "signing_day_3" }, "signing")}>Demo: 3 days later</Button>}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

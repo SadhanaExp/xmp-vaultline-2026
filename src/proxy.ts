@@ -5,6 +5,7 @@ const PUBLIC = new Set(["/login"]);
 
 function isPublic(pathname: string) {
   if (PUBLIC.has(pathname)) return true;
+  if (pathname === "/api/docusign/callback") return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname === "/favicon.ico") return true;
   return false;

@@ -140,7 +140,7 @@ function seedInbox(): HandoffLead[] {
   return [
     { id: "te-abc", source_crm: "Total Expert", company: "ABC Corp", quote_amount: "$48,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted. Ops signer confirmed. Ready for Experience.com Agreement.", gaps: [], contacts: [{ name: "Priya Mehta", role: "VP Operations", is_signer: true, email: "priya@abccorp.example" }, { name: "Rajesh Iyer", role: "Finance", is_signer: false, email: "rajesh@abccorp.example" }], accepted_at: "18 Sep 2026 09:12", customer_id: "abc-corp" },
     { id: "enc-xyz", source_crm: "Encompass", company: "XYZ Corp", quote_amount: "$32,000 / year", quote_version: "v2", status: "accepted", why_qualified: "LOS file complete. Lending head is signer. Map to Encompass Agreement.", gaps: [], contacts: [{ name: "Sana Kapoor", role: "Head of Lending", is_signer: true, email: "sana@xyzcorp.example" }, { name: "Arjun Desai", role: "Compliance", is_signer: false, email: "arjun@xyzcorp.example" }], accepted_at: "18 Sep 2026 09:08", customer_id: "xyz-corp" },
-    { id: "bp-pqr", source_crm: "BytePro", company: "PQR Lending", quote_amount: "$24,000 / year", quote_version: "v2", status: "queued", why_qualified: "Pipeline conversion > 40%. Quote v2 accepted in BytePro. Missing billing contact.", gaps: ["No billing / AP contact on the file"], contacts: [{ name: "Neha Rao", role: "COO", is_signer: true, email: "neha@pqrlending.example" }] },
+    { id: "bp-cedar", source_crm: "BytePro", company: "Cedar Mortgage", quote_amount: "$36,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted. Originator is signer. Open commercials — use this file to send a DocuSign demo envelope.", gaps: [], contacts: [{ name: "Anika Shah", role: "VP Origination", is_signer: true, email: "anika@cedarmortgage.example" }, { name: "Chris Lang", role: "Controller", is_signer: false, email: "chris@cedarmortgage.example" }], accepted_at: "18 Sep 2026 10:04", customer_id: "cedar-mortgage" },
     { id: "az-lakeside", source_crm: "AgencyZoom", company: "Lakeside Insurance", quote_amount: "$18,500 / year", quote_version: "v2", status: "queued", why_qualified: "Agency book of 1,200 policies. Principal signed the quote in AgencyZoom.", gaps: [], contacts: [{ name: "Omar Sheikh", role: "Principal", is_signer: true, email: "omar@lakeside.example" }, { name: "Leah Kim", role: "Office Manager", is_signer: false, email: "leah@lakeside.example" }] },
     { id: "enc-northstar", source_crm: "Encompass", company: "Northstar Credit Union", quote_amount: "$51,000 / year", quote_version: "v2", status: "queued", why_qualified: "Encompass LOS deal won. Credit committee approved. Use Encompass Agreement.", gaps: ["Order form not attached in CRM"], contacts: [{ name: "Dev Patel", role: "SVP Lending", is_signer: true, email: "dev@northstar.example" }, { name: "Maya Brooks", role: "General Counsel", is_signer: false, email: "maya@northstar.example" }] },
   ];
@@ -158,8 +158,30 @@ function lockQuoted(account: AccountState) {
 export function initialContractState(): StoredContractState {
   const abc = baseAccount("abc-corp", "ABC Corp", "Total Expert", "$48,000 / year", [{ name: "Priya Mehta", role: "VP Operations", is_signer: true, email: "priya@abccorp.example" }, { name: "Rajesh Iyer", role: "Finance", is_signer: false, email: "rajesh@abccorp.example" }]);
   const xyz = baseAccount("xyz-corp", "XYZ Corp", "Encompass", "$32,000 / year", [{ name: "Sana Kapoor", role: "Head of Lending", is_signer: true, email: "sana@xyzcorp.example" }, { name: "Arjun Desai", role: "Compliance", is_signer: false, email: "arjun@xyzcorp.example" }]);
+  const cedar = baseAccount("cedar-mortgage", "Cedar Mortgage", "BytePro", "$36,000 / year", [{ name: "Anika Shah", role: "VP Origination", is_signer: true, email: "anika@cedarmortgage.example" }, { name: "Chris Lang", role: "Controller", is_signer: false, email: "chris@cedarmortgage.example" }]);
   lockQuoted(abc); lockQuoted(xyz);
-  return { now: CLOCK.start, active_id: "abc-corp", accounts: { "abc-corp": abc, "xyz-corp": xyz }, inbox: seedInbox() };
+  return { now: CLOCK.start, active_id: "cedar-mortgage", accounts: { "abc-corp": abc, "xyz-corp": xyz, "cedar-mortgage": cedar }, inbox: seedInbox() };
+}
+
+/** Persisted demo state keeps ABC/XYZ; new seed accounts are merged in without wiping signed files. */
+function hydrateSeedAccounts(state: StoredContractState) {
+  const seeded = initialContractState();
+  for (const [id, account] of Object.entries(seeded.accounts)) {
+    if (!state.accounts[id]) {
+      state.accounts[id] = account;
+      if (id === "cedar-mortgage") state.active_id = id;
+    }
+  }
+  const cedar = state.accounts["cedar-mortgage"];
+  if (cedar && cedar.sign_index > 0 && cedar.sign_index < 4) {
+    cedar.sign_index = 4;
+    cedar.docusign_provider = "demo";
+    cedar.docusign_note = "Demo profile: the DocuSign signing page was skipped. In live, Vaultline navigates the signer to DocuSign and returns here once both parties have signed.";
+    state.active_id = "cedar-mortgage";
+  }
+  for (const lead of seeded.inbox) {
+    if (!state.inbox.some((item) => item.id === lead.id)) state.inbox.push(lead);
+  }
 }
 
 export function leadFromPayload(payload: QuoteHandoffPayload): HandoffLead {
@@ -332,7 +354,16 @@ export function snapshot(state: StoredContractState): AppState {
       outreach_subject: account.outreach_subject ?? "", outreach_body: account.outreach_body ?? "",
       outreach_actions: account.outreach_actions ?? [],
     },
-    signing_watch: { status: ["not_sent", "waiting_customer", "customer_signed", "countersigned", "fully_executed"][account.sign_index] as AppState["signing_watch"]["status"], signer: signer(account).name, signer_email: signer(account).email, sent_at: account.sent_at, days_waiting: account.sign_index === 1 && sent ? Math.max(0, Math.floor((Date.parse(state.now) - sent.getTime()) / 86_400_000)) : 0, reminder_due_at: reminderAt, reminder_due: account.sign_index === 1 && Boolean(reminderAt && Date.parse(state.now) >= Date.parse(reminderAt) && !account.reminder_sent_at), reminder_sent_at: account.reminder_sent_at, reminder_count: account.reminder_count },
+    signing_watch: {
+      status: ["not_sent", "waiting_customer", "customer_signed", "countersigned", "fully_executed"][account.sign_index] as AppState["signing_watch"]["status"],
+      signer: signer(account).name, signer_email: signer(account).email, sent_at: account.sent_at,
+      days_waiting: account.sign_index === 1 && sent ? Math.max(0, Math.floor((Date.parse(state.now) - sent.getTime()) / 86_400_000)) : 0,
+      reminder_due_at: reminderAt,
+      reminder_due: account.sign_index === 1 && Boolean(reminderAt && Date.parse(state.now) >= Date.parse(reminderAt) && !account.reminder_sent_at),
+      reminder_sent_at: account.reminder_sent_at, reminder_count: account.reminder_count,
+      envelope_id: account.docusign_envelope_id, envelope_url: account.docusign_envelope_url,
+      provider: account.docusign_provider, note: account.docusign_note,
+    },
     demo_clock: { now: state.now, preset, label: CLOCK_LABEL[preset] },
     exceptions: {
       gaps: state.inbox.filter((lead) => lead.status === "queued" && lead.gaps.length > 0),
@@ -590,7 +621,31 @@ function applyMutation(state: StoredContractState, mutation: ContractMutation): 
       break;
     }
     case "send":
-      if (account.contract_generated && account.sign_index === 0) { account.sign_index = 1; account.sent_at = state.now; account.reminder_sent_at = undefined; account.reminder_count = 0; account.customer.activity.unshift({ at: stamp(state.now), text: `${account.customer.contract.name} sent for signature to ${signer(account).name}.` }); }
+      if (account.contract_generated && account.sign_index === 0) {
+        account.sent_at = state.now;
+        account.reminder_sent_at = undefined;
+        account.reminder_count = 0;
+        account.docusign_envelope_id = mutation.envelopeId;
+        account.docusign_envelope_url = mutation.envelopeUrl;
+        account.docusign_provider = "demo";
+        account.docusign_note = "Demo profile: the DocuSign signing page was skipped. In live, Vaultline navigates the signer to DocuSign and returns here once both parties have signed.";
+        account.sign_index = 4;
+        const who = signer(account).name;
+        account.customer.activity.unshift(
+          { at: stamp(state.now), text: `${account.customer.contract.name} fully executed. Signed Contract stored on ${account.customer.name}. Initial Purchase → Won.` },
+          { at: stamp(state.now), text: "Experience.com countersigned (demo — DocuSign page skipped)." },
+          { at: stamp(state.now), text: `${who} signed (demo — DocuSign page skipped).` },
+          { at: stamp(state.now), text: `${account.customer.contract.name} sent for signature to ${who}. Demo skipped the DocuSign signing page; live would open DocuSign and return here after signing.` },
+        );
+      }
+      break;
+    case "signing-sync":
+      if (account.contract_generated && mutation.signIndex > account.sign_index && mutation.signIndex <= 4) {
+        account.sign_index = mutation.signIndex;
+        if (mutation.note) account.docusign_note = mutation.note;
+        const notes = ["", "", `Customer signed ${account.customer.contract.name}.`, "Experience.com countersigned.", `${account.customer.contract.name} fully executed. Signed Contract stored on ${account.customer.name}. Initial Purchase → Won.`];
+        account.customer.activity.unshift({ at: stamp(state.now), text: notes[account.sign_index] ?? mutation.note ?? "Envelope updated from DocuSign." });
+      }
       break;
     case "advance":
       if (account.contract_generated && account.sign_index < 4) { account.sign_index += 1; const notes = ["", "", `Customer signed ${account.customer.contract.name}.`, "Experience.com countersigned.", `${account.customer.contract.name} fully executed. Signed Contract stored on ${account.customer.name}. Initial Purchase → Won.`]; account.customer.activity.unshift({ at: stamp(state.now), text: notes[account.sign_index]! }); }
@@ -604,7 +659,10 @@ function applyMutation(state: StoredContractState, mutation: ContractMutation): 
 }
 
 async function locked<T>(work: (state: StoredContractState) => T): Promise<T> {
-  return persistLocked(work, initialContractState);
+  return persistLocked((state) => {
+    hydrateSeedAccounts(state);
+    return work(state);
+  }, initialContractState);
 }
 
 export async function getContractState(): Promise<AppState> {

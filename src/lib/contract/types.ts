@@ -78,6 +78,7 @@ export interface SigningWatch {
   status: "not_sent" | "waiting_customer" | "customer_signed" | "countersigned" | "fully_executed";
   signer: string; signer_email: string; sent_at?: string; days_waiting: number; reminder_due_at?: string;
   reminder_due: boolean; reminder_sent_at?: string; reminder_count: number;
+  envelope_id?: string; envelope_url?: string; provider?: "docusign" | "demo"; note?: string;
 }
 export interface DemoClock { now: string; preset: ClockPreset; label: string }
 export interface WaitingSignature { customer_id: string; name: string; signer: string }
@@ -129,6 +130,8 @@ export interface AccountState {
   negotiation_suggestion: string; outreach_channel?: OutreachChannel; outreach_subject: string; outreach_body: string;
   outreach_actions: OutreachAction[];
   sent_at?: string; reminder_sent_at?: string; reminder_count: number;
+  docusign_envelope_id?: string; docusign_envelope_url?: string; docusign_note?: string;
+  docusign_provider?: "docusign" | "demo";
 }
 export interface StoredContractState {
   now: string; active_id: string; accounts: Record<string, AccountState>; inbox: HandoffLead[];
@@ -147,8 +150,9 @@ export type ContractMutation =
       provider?: "internal" | "google_calendar" | "demo"; meetingUrl?: string; calendarEventUrl?: string;
       calendarEventId?: string; integrationNote?: string;
     }
-  | { type: "send" }
+  | { type: "send"; envelopeId?: string; envelopeUrl?: string; note?: string; provider?: "docusign" | "demo" }
   | { type: "advance" }
+  | { type: "signing-sync"; signIndex: number; note?: string }
   | { type: "renewal-start" }
   | { type: "renewal-copilot"; customerId: string; action: RenewalAction }
   | { type: "agent-run" };

@@ -154,8 +154,15 @@ export async function POST(request: Request, context: Context) {
     }
     return Response.json(await mutateContractState({ type: "outreach", channel, startsAt, endsAt }));
   }
-  if (route === "send" || route === "contract/send") return Response.json(await mutateContractState({ type: "send" }));
+  if (route === "send" || route === "contract/send") {
+    return Response.json(await mutateContractState({
+      type: "send",
+      note: "Demo profile: the DocuSign signing page was skipped. In live, Vaultline navigates the signer to DocuSign and returns here once both parties have signed.",
+      provider: "demo",
+    }));
+  }
   if (route === "signing/advance") return Response.json(await mutateContractState({ type: "advance" }));
+  if (route === "signing/refresh") return Response.json(await getContractState());
   if (route === "renewal/start") return Response.json(await mutateContractState({ type: "renewal-start" }));
   if (route === "renewal/copilot") {
     if (typeof body?.customer_id !== "string" || !["run", "snooze", "nudge"].includes(String(body.action ?? "run"))) return badRequest("Invalid renewal request");

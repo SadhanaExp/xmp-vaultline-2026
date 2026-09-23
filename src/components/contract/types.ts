@@ -144,6 +144,10 @@ export interface ContractState {
     reminder_due?: boolean;
     reminder_sent_at?: string;
     reminder_count: number;
+    envelope_id?: string;
+    envelope_url?: string;
+    provider?: "docusign" | "demo";
+    note?: string;
   };
   demo_clock: { now: string; preset: ClockPreset; label: string };
   exceptions: {
