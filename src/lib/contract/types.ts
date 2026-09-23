@@ -136,6 +136,7 @@ export interface AccountState {
 export interface StoredContractState {
   now: string; active_id: string; accounts: Record<string, AccountState>; inbox: HandoffLead[];
   last_handoff?: HandoffRun; last_renewal?: RenewalRun; last_agent_run?: AgentRun;
+  demo_wave?: string;
 }
 
 export type ContractMutation =

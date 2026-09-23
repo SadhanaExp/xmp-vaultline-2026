@@ -141,6 +141,7 @@ function seedInbox(): HandoffLead[] {
     { id: "te-abc", source_crm: "Total Expert", company: "ABC Corp", quote_amount: "$48,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted. Ops signer confirmed. Ready for Experience.com Agreement.", gaps: [], contacts: [{ name: "Priya Mehta", role: "VP Operations", is_signer: true, email: "priya@abccorp.example" }, { name: "Rajesh Iyer", role: "Finance", is_signer: false, email: "rajesh@abccorp.example" }], accepted_at: "18 Sep 2026 09:12", customer_id: "abc-corp" },
     { id: "enc-xyz", source_crm: "Encompass", company: "XYZ Corp", quote_amount: "$32,000 / year", quote_version: "v2", status: "accepted", why_qualified: "LOS file complete. Lending head is signer. Map to Encompass Agreement.", gaps: [], contacts: [{ name: "Sana Kapoor", role: "Head of Lending", is_signer: true, email: "sana@xyzcorp.example" }, { name: "Arjun Desai", role: "Compliance", is_signer: false, email: "arjun@xyzcorp.example" }], accepted_at: "18 Sep 2026 09:08", customer_id: "xyz-corp" },
     { id: "bp-cedar", source_crm: "BytePro", company: "Cedar Mortgage", quote_amount: "$36,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted. Originator is signer. Open commercials — use this file to send a DocuSign demo envelope.", gaps: [], contacts: [{ name: "Anika Shah", role: "VP Origination", is_signer: true, email: "anika@cedarmortgage.example" }, { name: "Chris Lang", role: "Controller", is_signer: false, email: "chris@cedarmortgage.example" }], accepted_at: "18 Sep 2026 10:04", customer_id: "cedar-mortgage" },
+    { id: "bp-pqr", source_crm: "BytePro", company: "PQR Lending", quote_amount: "$24,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted in BytePro. Commercials reopened for the review walkthrough.", gaps: [], contacts: [{ name: "Neha Rao", role: "COO", is_signer: true, email: "neha@pqrlending.example" }], accepted_at: "18 Sep 2026 09:22", customer_id: "pqr-lending" },
     { id: "az-lakeside", source_crm: "AgencyZoom", company: "Lakeside Insurance", quote_amount: "$18,500 / year", quote_version: "v2", status: "queued", why_qualified: "Agency book of 1,200 policies. Principal signed the quote in AgencyZoom.", gaps: [], contacts: [{ name: "Omar Sheikh", role: "Principal", is_signer: true, email: "omar@lakeside.example" }, { name: "Leah Kim", role: "Office Manager", is_signer: false, email: "leah@lakeside.example" }] },
     { id: "enc-northstar", source_crm: "Encompass", company: "Northstar Credit Union", quote_amount: "$51,000 / year", quote_version: "v2", status: "queued", why_qualified: "Encompass LOS deal won. Credit committee approved. Use Encompass Agreement.", gaps: ["Order form not attached in CRM"], contacts: [{ name: "Dev Patel", role: "SVP Lending", is_signer: true, email: "dev@northstar.example" }, { name: "Maya Brooks", role: "General Counsel", is_signer: false, email: "maya@northstar.example" }] },
   ];
@@ -155,32 +156,73 @@ function lockQuoted(account: AccountState) {
   account.negotiation_summary = `${selected.name} locked at ${account.customer.contract.quote_amount} (quoted terms).`;
 }
 
+function reopenCommercials(account: AccountState) {
+  account.negotiation_status = "open";
+  account.contract_generated = false;
+  account.sign_index = 0;
+  account.sent_at = undefined;
+  account.reminder_sent_at = undefined;
+  account.reminder_count = 0;
+  account.selected_package_id = "";
+  account.negotiation_summary = "";
+  account.negotiation_suggestion = "";
+  account.concern = "none";
+  account.concession_percent = 0;
+  account.docusign_envelope_id = undefined;
+  account.docusign_envelope_url = undefined;
+  account.docusign_note = undefined;
+  account.docusign_provider = undefined;
+  if (account.customer.deals.find((deal) => deal.id === "initial")) {
+    account.customer.deals.find((deal) => deal.id === "initial")!.status = "Quoted";
+  }
+}
+
+function markExecutedDemo(account: AccountState) {
+  account.contract_generated = true;
+  account.sign_index = 4;
+  account.docusign_provider = "demo";
+  account.docusign_note = "Demo profile: the DocuSign signing page was skipped. In live, Vaultline navigates the signer to DocuSign and returns here once both parties have signed.";
+  lockQuoted(account);
+}
+
+const TRIAGE_WAVE = "open-abc-xyz-pqr-keep-cedar";
+const TRIAGE_OPEN_IDS = ["abc-corp", "xyz-corp", "pqr-lending"];
+
 export function initialContractState(): StoredContractState {
   const abc = baseAccount("abc-corp", "ABC Corp", "Total Expert", "$48,000 / year", [{ name: "Priya Mehta", role: "VP Operations", is_signer: true, email: "priya@abccorp.example" }, { name: "Rajesh Iyer", role: "Finance", is_signer: false, email: "rajesh@abccorp.example" }]);
   const xyz = baseAccount("xyz-corp", "XYZ Corp", "Encompass", "$32,000 / year", [{ name: "Sana Kapoor", role: "Head of Lending", is_signer: true, email: "sana@xyzcorp.example" }, { name: "Arjun Desai", role: "Compliance", is_signer: false, email: "arjun@xyzcorp.example" }]);
   const cedar = baseAccount("cedar-mortgage", "Cedar Mortgage", "BytePro", "$36,000 / year", [{ name: "Anika Shah", role: "VP Origination", is_signer: true, email: "anika@cedarmortgage.example" }, { name: "Chris Lang", role: "Controller", is_signer: false, email: "chris@cedarmortgage.example" }]);
-  lockQuoted(abc); lockQuoted(xyz);
-  return { now: CLOCK.start, active_id: "cedar-mortgage", accounts: { "abc-corp": abc, "xyz-corp": xyz, "cedar-mortgage": cedar }, inbox: seedInbox() };
+  const pqr = baseAccount("pqr-lending", "PQR Lending", "BytePro", "$24,000 / year", [{ name: "Neha Rao", role: "COO", is_signer: true, email: "neha@pqrlending.example" }]);
+  markExecutedDemo(cedar);
+  return {
+    now: CLOCK.start, active_id: "abc-corp", demo_wave: TRIAGE_WAVE,
+    accounts: { "abc-corp": abc, "xyz-corp": xyz, "cedar-mortgage": cedar, "pqr-lending": pqr },
+    inbox: seedInbox(),
+  };
 }
 
 /** Persisted demo state keeps ABC/XYZ; new seed accounts are merged in without wiping signed files. */
 function hydrateSeedAccounts(state: StoredContractState) {
   const seeded = initialContractState();
   for (const [id, account] of Object.entries(seeded.accounts)) {
-    if (!state.accounts[id]) {
-      state.accounts[id] = account;
-      if (id === "cedar-mortgage") state.active_id = id;
-    }
-  }
-  const cedar = state.accounts["cedar-mortgage"];
-  if (cedar && cedar.sign_index > 0 && cedar.sign_index < 4) {
-    cedar.sign_index = 4;
-    cedar.docusign_provider = "demo";
-    cedar.docusign_note = "Demo profile: the DocuSign signing page was skipped. In live, Vaultline navigates the signer to DocuSign and returns here once both parties have signed.";
-    state.active_id = "cedar-mortgage";
+    if (!state.accounts[id]) state.accounts[id] = account;
   }
   for (const lead of seeded.inbox) {
     if (!state.inbox.some((item) => item.id === lead.id)) state.inbox.push(lead);
+  }
+  const pqr = Object.values(state.accounts).find((account) => account.customer.name === "PQR Lending");
+  if (pqr && pqr.customer.id !== "pqr-lending" && !state.accounts["pqr-lending"]) {
+    state.accounts["pqr-lending"] = pqr;
+  }
+  if (state.demo_wave !== TRIAGE_WAVE) {
+    for (const id of TRIAGE_OPEN_IDS) {
+      const account = state.accounts[id] ?? Object.values(state.accounts).find((item) => item.customer.name === seeded.accounts[id]?.customer.name);
+      if (account) reopenCommercials(account);
+    }
+    const cedar = state.accounts["cedar-mortgage"];
+    if (cedar) markExecutedDemo(cedar);
+    state.active_id = "abc-corp";
+    state.demo_wave = TRIAGE_WAVE;
   }
 }
 
@@ -264,13 +306,16 @@ function agentRecommendations(state: StoredContractState, account: AccountState)
     evidence: [...gapped.gaps, `Signer: ${gapped.contacts.find((contact) => contact.is_signer)?.name ?? "not found"}`],
     action_label: "Review packet", action: "accept-packet", target_id: gapped.id,
   });
-  if (account.negotiation_status === "open") recommendations.push({
-    id: `commercial-${account.customer.id}`, title: `Draft ${account.customer.name} commercial position`,
-    intent: "Use the catalog package nearest the accepted quote and preserve approval before lock.",
-    priority: "high", confidence: 94, risk: "low", requires_approval: false,
-    evidence: [`Accepted quote: ${account.customer.contract.quote_amount}`, `Source: ${account.customer.source_crm}`],
-    action_label: "Draft proposal", action: "propose-commercials", target_id: account.customer.id,
-  });
+  for (const item of Object.values(state.accounts)) {
+    if (item.negotiation_status !== "open") continue;
+    recommendations.push({
+      id: `commercial-${item.customer.id}`, title: `Draft ${item.customer.name} commercial position`,
+      intent: "Use the catalog package nearest the accepted quote and preserve approval before lock.",
+      priority: "high", confidence: 94, risk: "low", requires_approval: false,
+      evidence: [`Accepted quote: ${item.customer.contract.quote_amount}`, `Source: ${item.customer.source_crm}`],
+      action_label: "Draft proposal", action: "propose-commercials", target_id: item.customer.id,
+    });
+  }
   if (account.negotiation_status === "proposed") recommendations.push({
     id: `lock-${account.customer.id}`, title: "Approve and lock proposed terms",
     intent: "Human approval is required before the agent changes binding commercials.",
