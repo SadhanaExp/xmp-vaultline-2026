@@ -142,6 +142,7 @@ function seedInbox(): HandoffLead[] {
     { id: "enc-xyz", source_crm: "Encompass", company: "XYZ Corp", quote_amount: "$32,000 / year", quote_version: "v2", status: "accepted", why_qualified: "LOS file complete. Lending head is signer. Map to Encompass Agreement.", gaps: [], contacts: [{ name: "Sana Kapoor", role: "Head of Lending", is_signer: true, email: "sana@xyzcorp.example" }, { name: "Arjun Desai", role: "Compliance", is_signer: false, email: "arjun@xyzcorp.example" }], accepted_at: "18 Sep 2026 09:08", customer_id: "xyz-corp" },
     { id: "bp-cedar", source_crm: "BytePro", company: "Cedar Mortgage", quote_amount: "$36,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted. Originator is signer. Open commercials — use this file to send a DocuSign demo envelope.", gaps: [], contacts: [{ name: "Anika Shah", role: "VP Origination", is_signer: true, email: "anika@cedarmortgage.example" }, { name: "Chris Lang", role: "Controller", is_signer: false, email: "chris@cedarmortgage.example" }], accepted_at: "18 Sep 2026 10:04", customer_id: "cedar-mortgage" },
     { id: "bp-pqr", source_crm: "BytePro", company: "PQR Lending", quote_amount: "$24,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted in BytePro. Commercials reopened for the review walkthrough.", gaps: [], contacts: [{ name: "Neha Rao", role: "COO", is_signer: true, email: "neha@pqrlending.example" }], accepted_at: "18 Sep 2026 09:22", customer_id: "pqr-lending" },
+    { id: "enc-meridian", source_crm: "Encompass", company: "Meridian Financial", quote_amount: "$39,000 / year", quote_version: "v2", status: "accepted", why_qualified: "Quote v2 accepted. Client experience lead is signer. Commercials still open.", gaps: [], contacts: [{ name: "Elena Vargas", role: "VP Client Experience", is_signer: true, email: "elena@meridianfinancial.example" }, { name: "Sam Okafor", role: "Finance", is_signer: false, email: "sam@meridianfinancial.example" }], accepted_at: "18 Sep 2026 09:30", customer_id: "meridian-financial" },
     { id: "az-lakeside", source_crm: "AgencyZoom", company: "Lakeside Insurance", quote_amount: "$18,500 / year", quote_version: "v2", status: "queued", why_qualified: "Agency book of 1,200 policies. Principal signed the quote in AgencyZoom.", gaps: [], contacts: [{ name: "Omar Sheikh", role: "Principal", is_signer: true, email: "omar@lakeside.example" }, { name: "Leah Kim", role: "Office Manager", is_signer: false, email: "leah@lakeside.example" }] },
     { id: "enc-northstar", source_crm: "Encompass", company: "Northstar Credit Union", quote_amount: "$51,000 / year", quote_version: "v2", status: "queued", why_qualified: "Encompass LOS deal won. Credit committee approved. Use Encompass Agreement.", gaps: ["Order form not attached in CRM"], contacts: [{ name: "Dev Patel", role: "SVP Lending", is_signer: true, email: "dev@northstar.example" }, { name: "Maya Brooks", role: "General Counsel", is_signer: false, email: "maya@northstar.example" }] },
     { id: "az-harbor", source_crm: "AgencyZoom", company: "Harbor Point Realty", quote_amount: "$21,000 / year", quote_version: "v2", status: "queued", why_qualified: "Brokerage of 340 agents. Managing broker accepted the quote in AgencyZoom.", gaps: [], contacts: [{ name: "Tara Nolan", role: "Managing Broker", is_signer: true, email: "tara@harborpoint.example" }, { name: "Diego Ruiz", role: "Operations", is_signer: false, email: "diego@harborpoint.example" }] },
@@ -187,18 +188,19 @@ function markExecutedDemo(account: AccountState) {
   lockQuoted(account);
 }
 
-const TRIAGE_WAVE = "open-abc-xyz-pqr-keep-cedar";
-const TRIAGE_OPEN_IDS = ["abc-corp", "xyz-corp", "pqr-lending"];
+const TRIAGE_WAVE = "open-abc-xyz-pqr-add-meridian";
+const TRIAGE_OPEN_IDS = ["abc-corp", "xyz-corp", "pqr-lending", "meridian-financial"];
 
 export function initialContractState(): StoredContractState {
   const abc = baseAccount("abc-corp", "ABC Corp", "Total Expert", "$48,000 / year", [{ name: "Priya Mehta", role: "VP Operations", is_signer: true, email: "priya@abccorp.example" }, { name: "Rajesh Iyer", role: "Finance", is_signer: false, email: "rajesh@abccorp.example" }]);
   const xyz = baseAccount("xyz-corp", "XYZ Corp", "Encompass", "$32,000 / year", [{ name: "Sana Kapoor", role: "Head of Lending", is_signer: true, email: "sana@xyzcorp.example" }, { name: "Arjun Desai", role: "Compliance", is_signer: false, email: "arjun@xyzcorp.example" }]);
   const cedar = baseAccount("cedar-mortgage", "Cedar Mortgage", "BytePro", "$36,000 / year", [{ name: "Anika Shah", role: "VP Origination", is_signer: true, email: "anika@cedarmortgage.example" }, { name: "Chris Lang", role: "Controller", is_signer: false, email: "chris@cedarmortgage.example" }]);
   const pqr = baseAccount("pqr-lending", "PQR Lending", "BytePro", "$24,000 / year", [{ name: "Neha Rao", role: "COO", is_signer: true, email: "neha@pqrlending.example" }]);
+  const meridian = baseAccount("meridian-financial", "Meridian Financial", "Encompass", "$39,000 / year", [{ name: "Elena Vargas", role: "VP Client Experience", is_signer: true, email: "elena@meridianfinancial.example" }, { name: "Sam Okafor", role: "Finance", is_signer: false, email: "sam@meridianfinancial.example" }]);
   markExecutedDemo(cedar);
   return {
-    now: CLOCK.start, active_id: "abc-corp", demo_wave: TRIAGE_WAVE,
-    accounts: { "abc-corp": abc, "xyz-corp": xyz, "cedar-mortgage": cedar, "pqr-lending": pqr },
+    now: CLOCK.start, active_id: "meridian-financial", demo_wave: TRIAGE_WAVE,
+    accounts: { "abc-corp": abc, "xyz-corp": xyz, "cedar-mortgage": cedar, "pqr-lending": pqr, "meridian-financial": meridian },
     inbox: seedInbox(),
   };
 }
@@ -223,7 +225,7 @@ function hydrateSeedAccounts(state: StoredContractState) {
     }
     const cedar = state.accounts["cedar-mortgage"];
     if (cedar) markExecutedDemo(cedar);
-    state.active_id = "abc-corp";
+    state.active_id = "meridian-financial";
     state.demo_wave = TRIAGE_WAVE;
   }
 }
